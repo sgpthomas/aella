@@ -1,0 +1,8 @@
+a := input;
+b := a / 10 * 2;
+
+if a == 2 {
+    blah := 1;
+} else {
+    bla := 1;
+};
