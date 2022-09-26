@@ -34,7 +34,6 @@ dependencies = [
  "pest_derive",
  "rand",
  "rand_pcg",
- "ruler",
  "serde",
  "serde_json",
  "serde_sexpr",
@@ -164,6 +163,7 @@ dependencies = [
  "egg",
  "json",
  "plotlib",
+ "ruler",
 ]
 
 [[package]]

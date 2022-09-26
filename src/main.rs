@@ -6,9 +6,8 @@ mod synthesis;
 
 use argh::FromArgs;
 use chain_cmp::chmp;
-use comp_gen::ToRecExpr;
+use comp_gen::{ruler, ToRecExpr};
 use egg::RecExpr;
-use ruler::SynthParams;
 use std::path::{Path, PathBuf};
 
 use crate::lang::Command;
@@ -29,17 +28,17 @@ enum Commands {
     Compile(CompileOpts),
 }
 
-#[derive(FromArgs)]
+#[derive(Clone, FromArgs)]
 #[argh(subcommand, name = "synth")]
 /// Synth options.
-struct SynthOpts {
+pub struct SynthOpts {
     #[argh(positional)]
     output: String,
 }
 
 #[derive(FromArgs)]
 #[argh(subcommand, name = "compile")]
-/// Synth options.
+/// Compile options.
 struct CompileOpts {
     /// input file.
     #[argh(positional)]
@@ -55,7 +54,7 @@ fn read_path(path: &str) -> Result<PathBuf, String> {
 }
 
 fn synth(synth_opts: SynthOpts) {
-    let args: SynthParams = SynthParams {
+    let args: ruler::SynthParams = ruler::SynthParams {
         variables: 4,
         iters: 2,
         abs_timeout: 240,
@@ -63,9 +62,9 @@ fn synth(synth_opts: SynthOpts) {
         eqsat_node_limit: 2_000_000,
         eqsat_iter_limit: 2,
         eqsat_time_limit: 10,
-        ..SynthParams::default()
+        ..ruler::SynthParams::default()
     };
-    let report = synthesis::run(args);
+    let report = synthesis::run(args, synth_opts.clone());
     let file = std::fs::File::create(&synth_opts.output)
         .unwrap_or_else(|_| panic!("Failed to open '{}'", &synth_opts.output));
     serde_json::to_writer_pretty(file, &report).expect("failed to write json");

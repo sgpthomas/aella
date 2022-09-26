@@ -2,10 +2,10 @@ use egg::Id;
 use itertools::Itertools;
 use rand::Rng;
 use rand_pcg::Pcg64;
-use ruler::{letter, map, self_product, Report, SynthLanguage, SynthParams, Synthesizer};
 use std::collections::BTreeMap;
 
 use crate::lang::Aella;
+use comp_gen::ruler;
 
 type Env = BTreeMap<egg::Symbol, i64>;
 
@@ -50,14 +50,14 @@ impl Value {
     fn random_env(rng: &mut Pcg64, prim: usize, n_vars: usize) -> Value {
         let mut map = BTreeMap::default();
         for i in 0..n_vars {
-            let rand_sym = egg::Symbol::from(letter(i));
+            let rand_sym = egg::Symbol::from(ruler::letter(i));
             map.insert(rand_sym, rng.gen_range(-100, 100));
         }
 
         let prim = if prim == 0 {
             Some(PrimVal::Int(rng.gen_range(-100, 100)))
         } else if prim == 1 {
-            let rand_sym = egg::Symbol::from(letter(rng.gen_range(0, 26)));
+            let rand_sym = egg::Symbol::from(ruler::letter(rng.gen_range(0, 26)));
             // make sure that the name of this variable is bound in the environment
             map.insert(rand_sym, rng.gen_range(-100, 100));
             Some(PrimVal::Var(rand_sym))
@@ -87,8 +87,9 @@ impl std::fmt::Display for Value {
     }
 }
 
-impl SynthLanguage for Aella {
+impl ruler::SynthLanguage for Aella {
     type Constant = Value;
+    type Config = crate::SynthOpts;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut get: F) -> ruler::CVec<Self>
     where
@@ -97,16 +98,16 @@ impl SynthLanguage for Aella {
         // println!("expr: {self}");
         let x = match self {
             Aella::Plus([l, r]) => {
-                map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l + r)))
+                ruler::map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l + r)))
             }
             Aella::Sub([l, r]) => {
-                map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l - r)))
+                ruler::map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l - r)))
             }
             Aella::Times([l, r]) => {
-                map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l * r)))
+                ruler::map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l * r)))
             }
             Aella::Div([l, r]) => {
-                map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l / r)))
+                ruler::map!(get, l, r => Value::val2(l, r, |l, r| PrimVal::Int(l / r)))
             }
             Aella::Eq([_l, _r]) => todo!(),
             Aella::Lt([_l, _r]) => todo!(),
@@ -224,11 +225,11 @@ impl SynthLanguage for Aella {
         matches!(self, Aella::Num(..))
     }
 
-    fn init_synth(synth: &mut ruler::Synthesizer<Self>) {
+    fn init_synth(synth: &mut ruler::Synthesizer<Self, ruler::Uninit>) {
         // initial constants that will be in the graph
         let constants = [0];
 
-        let cvec_len = self_product(
+        let cvec_len = ruler::self_product(
             &constants
                 .iter()
                 .map(|x| Some(Value::prim(PrimVal::Int(*x))))
@@ -248,7 +249,7 @@ impl SynthLanguage for Aella {
         }
 
         let vars: Vec<egg::Symbol> = (0..synth.params.variables)
-            .map(|i| egg::Symbol::from(letter(i)))
+            .map(|i| egg::Symbol::from(ruler::letter(i)))
             .collect();
 
         for var in &vars {
@@ -284,7 +285,7 @@ impl SynthLanguage for Aella {
 
     fn make_layer<'a>(
         ids: Vec<Id>,
-        synth: &'a ruler::Synthesizer<Self>,
+        synth: &'a ruler::Synthesizer<Self, ruler::Init>,
         _iter: usize,
     ) -> Box<dyn Iterator<Item = Self> + 'a> {
         let binops = (0..2)
@@ -316,7 +317,7 @@ impl SynthLanguage for Aella {
     }
 
     fn is_valid(
-        synth: &mut ruler::Synthesizer<Self>,
+        _synth: &mut ruler::Synthesizer<Self, ruler::Init>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
     ) -> bool {
@@ -382,7 +383,7 @@ impl SynthLanguage for Aella {
     }
 }
 
-pub fn run(params: SynthParams) -> Report<Aella> {
-    let syn = Synthesizer::<Aella>::new(params.clone());
-    Aella::post_process(&params, syn.run())
+pub fn run(params: ruler::SynthParams, opts: crate::SynthOpts) -> ruler::Report<Aella> {
+    let syn = ruler::Synthesizer::<Aella, _>::new_with_data(params.clone(), opts).init();
+    <Aella as ruler::SynthLanguage>::post_process(&params, syn.run())
 }
